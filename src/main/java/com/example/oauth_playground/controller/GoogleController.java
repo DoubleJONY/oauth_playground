@@ -1,5 +1,11 @@
 package com.example.oauth_playground.controller;
 
+import com.example.oauth_playground.request.GoogleToken;
+import com.example.oauth_playground.response.OAuthResponse;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -8,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.Objects;
 
 @Controller
 public class GoogleController {
@@ -29,12 +36,11 @@ public class GoogleController {
                         + "?client_id=143550101505-m4fi6u9v0r3e7spjk231ftl67dq2aprg.apps.googleusercontent.com"
                         + "&redirect_uri=http://localhost:8080/login/oauth_google"
                         + "&response_type=code"
-                        + "&scope=https://www.googleapis.com/auth/userinfo.profile";
+                        + "&scope=https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile";
 
         return reqUrl;
     }
 
-    // 카카오 연동정보 조회
     @RequestMapping(value = "/login/oauth_google")
     public String oauthGoogle(
             @RequestParam(value = "code", required = false) String code
@@ -51,66 +57,30 @@ public class GoogleController {
         googleToken.setCode(code);
         googleToken.setRedirect_uri("http://localhost:8080/login/oauth_google");
 
-        String response = restTemplate.postForObject(uri, googleToken, String.class);
-        System.out.println("###response#### : " + response);
-        return response;
+        ResponseEntity<OAuthResponse> response = restTemplate.postForEntity(uri, googleToken, OAuthResponse.class);
+
+        if(!response.getStatusCode().is2xxSuccessful()) {;
+            return Objects.requireNonNull(response.getBody()).toString();
+        }
+
+        Object userInfo = getUserInfo(response.getBody().getAccessToken());
+
+        System.out.println("###userInfo#### : " + userInfo.toString());
+        return userInfo.toString();
     }
 
-    public static class GoogleToken {
-        public String grant_type;
-        public String client_id;
-        public String client_secret;
-        public String code;
-        public String redirect_uri;
+    private Object getUserInfo(String accessToken) {
 
-        public String getGrant_type() {
+        String uri = "https://www.googleapis.com/oauth2/v3/userinfo";
 
-            return grant_type;
-        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        HttpEntity request = new HttpEntity(headers);
 
-        public void setGrant_type(String grant_type) {
+        RestTemplate restTemplate = new RestTemplate();
 
-            this.grant_type = grant_type;
-        }
+        ResponseEntity<Object> response = restTemplate.exchange(uri, HttpMethod.GET, request, Object.class);
 
-        public String getClient_id() {
-
-            return client_id;
-        }
-
-        public void setClient_id(String client_id) {
-
-            this.client_id = client_id;
-        }
-
-        public String getClient_secret() {
-
-            return client_secret;
-        }
-
-        public void setClient_secret(String client_secret) {
-
-            this.client_secret = client_secret;
-        }
-
-        public String getCode() {
-
-            return code;
-        }
-
-        public void setCode(String code) {
-
-            this.code = code;
-        }
-
-        public String getRedirect_uri() {
-
-            return redirect_uri;
-        }
-
-        public void setRedirect_uri(String redirect_uri) {
-
-            this.redirect_uri = redirect_uri;
-        }
+        return response.getBody();
     }
 }

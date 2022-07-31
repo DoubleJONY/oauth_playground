@@ -1,9 +1,10 @@
 package com.example.oauth_playground.controller;
 
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import org.json.simple.JSONObject;
+import com.example.oauth_playground.response.OAuthResponse;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,14 +13,7 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.client.RestTemplate;
 
 import javax.servlet.http.HttpServletRequest;
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.HashMap;
+import java.util.Objects;
 
 @Controller
 public class NaverController {
@@ -45,7 +39,6 @@ public class NaverController {
         return reqUrl;
     }
 
-    // 카카오 연동정보 조회
     @RequestMapping(value = "/login/oauth_naver")
     public String oauthNaver(
             @RequestParam(value = "code", required = false) String code
@@ -59,8 +52,30 @@ public class NaverController {
                 + "&state=";
 
         RestTemplate restTemplate = new RestTemplate();
-        String response = restTemplate.getForObject(uri, String.class);
-        System.out.println("###response#### : " + response);
-        return response;
+        ResponseEntity<OAuthResponse> response = restTemplate.getForEntity(uri, OAuthResponse.class);
+
+        if(!response.getStatusCode().is2xxSuccessful()) {;
+            return Objects.requireNonNull(response.getBody()).toString();
+        }
+
+        Object userInfo = getUserInfo(response.getBody().getAccessToken());
+
+        System.out.println("###userInfo#### : " + userInfo.toString());
+        return userInfo.toString();
+    }
+
+    private Object getUserInfo(String accessToken) {
+
+        String uri = "https://openapi.naver.com/v1/nid/me";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + accessToken);
+        HttpEntity request = new HttpEntity(headers);
+
+        RestTemplate restTemplate = new RestTemplate();
+
+        ResponseEntity<Object> response = restTemplate.exchange(uri, HttpMethod.GET, request, Object.class);
+
+        return response.getBody();
     }
 }
